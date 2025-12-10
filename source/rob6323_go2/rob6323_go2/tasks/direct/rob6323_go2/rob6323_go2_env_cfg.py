@@ -27,6 +27,9 @@ class Rob6323Go2EnvCfg(DirectRLEnvCfg):
     Kd = 0.5   # Derivative gain
     torque_limits = 100.0  # Max torque
 
+    base_height_min = 0.20  # Terminate if base is lower than 20cm
+
+
     # env
     decimation = 4
     episode_length_s = 20.0
@@ -73,7 +76,7 @@ class Rob6323Go2EnvCfg(DirectRLEnvCfg):
         stiffness=0.0,  # CRITICAL: Set to 0 to disable implicit P-gain
         damping=0.0,    # CRITICAL: Set to 0 to disable implicit D-gain
     )
-    
+
     # scene
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=4.0, replicate_physics=True)
     contact_sensor: ContactSensorCfg = ContactSensorCfg(

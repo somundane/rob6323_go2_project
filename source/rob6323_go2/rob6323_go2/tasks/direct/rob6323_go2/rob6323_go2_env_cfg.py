@@ -19,8 +19,11 @@ from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, G
 
 from isaaclab.actuators import ImplicitActuatorCfg
 
+
 @configclass
 class Rob6323Go2EnvCfg(DirectRLEnvCfg):
+
+    observation_space = 48 + 4  # Added 4 for clock inputs
 
     # PD control gains
     Kp = 20.0  # Proportional gain
@@ -29,10 +32,10 @@ class Rob6323Go2EnvCfg(DirectRLEnvCfg):
 
     base_height_min = 0.20  # Terminate if base is lower than 20cm
 
-
     # env
     decimation = 4
     episode_length_s = 20.0
+
     # - spaces definition
     action_scale = 0.25
     action_space = 12
@@ -100,5 +103,18 @@ class Rob6323Go2EnvCfg(DirectRLEnvCfg):
     lin_vel_reward_scale = 1.0
     yaw_rate_reward_scale = 0.5
 
-    action_rate_reward_scale = -0.5     # from -0.5
+    action_rate_reward_scale = -0.1     # originally -0.1 try -0.5
 
+    # Additional reward scales
+    orient_reward_scale = -5.0
+    lin_vel_z_reward_scale = -0.02  # originally -0.02 try -0.06
+    dof_vel_reward_scale = -0.0001
+    ang_vel_xy_reward_scale = -0.001
+
+    raibert_heuristic_reward_scale = -10.0  # originally -10.0
+    # feet_clearance_reward_scale = -30.0
+    # tracking_contacts_shaped_force_reward_scale = 4.0
+
+    feet_clearance_reward_scale = -30.0  # originally -30.0 try -25
+    contact_force_reward_scale = 4  # originally 4 try 6
+    tracking_contacts_shaped_force_reward_scale = 4.0

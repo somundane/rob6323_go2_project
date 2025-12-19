@@ -29,6 +29,9 @@ class Rob6323Go2Env(DirectRLEnv):
 
     def __init__(self, cfg: Rob6323Go2EnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
+        # initialize stiction and viscous vars
+        self.rand_stict = torch.zeros(self.num_envs, device=self.device)
+        self.rand_visc = torch.zeros(self.num_envs, device=self.device)
 
         # Get specific body indices
         # Find indices in the ROBOT (for positions/kinematics)
@@ -120,14 +123,19 @@ class Rob6323Go2Env(DirectRLEnv):
 
     # Calculate torques via pd formula
     def _apply_action(self) -> None:
+        # Stict and visc
+        stiction_torque = self.rand_stict.unsqueeze(1) * torch.tanh(self.robot.data.joint_vel / 0.1)
+        viscous_torque = self.rand_visc.unsqueeze(1) * self.robot.data.joint_vel
+
         # Compute PD torques
         torques = torch.clip(
             (
                 self.Kp * (
                     self.desired_joint_pos 
-                    - self.robot.data.joint_pos 
+                    - self.robot.data.joint_pos
                 )
                 - self.Kd * self.robot.data.joint_vel
+                - (stiction_torque + viscous_torque)  # subtract friction
             ),
             -self.torque_limits,
             self.torque_limits,
@@ -182,7 +190,7 @@ class Rob6323Go2Env(DirectRLEnv):
         foot_height = (self.foot_positions_w[:, :, 2])   # - reference_heights
         target_height = 0.08 * phases + 0.02   # offset for foot radius 2cm
         rew_foot_clearance = torch.square(target_height - foot_height) * (1 - self.desired_contact_states)
-        rew_feet_clearance = torch.sum(rew_foot_clearance, dim=1)    #* self.rew_scales["feetClearance"]
+        rew_feet_clearance = torch.sum(rew_foot_clearance, dim=1)   # self.rew_scales["feetClearance"]
 
         foot_forces = torch.norm(self._contact_sensor.data.net_forces_w[:, self._feet_ids_sensor, :], dim=-1)
         desired_contact = self.desired_contact_states
@@ -211,6 +219,10 @@ class Rob6323Go2Env(DirectRLEnv):
         rew_dof_vel = torch.sum(torch.square(self.robot.data.joint_vel), dim=1)
 
         # 4. Penalize angular velocity in XY plane (roll/pitch)
+        # Hint: Sum the squares of the X and Y components of the base angular velocity.
+        rew_ang_vel_xy = torch.sum(torch.square(self.robot.data.root_ang_vel_b[:, :2]), dim=1)
+
+        # Rewarding change in pitch?
         # Hint: Sum the squares of the X and Y components of the base angular velocity.
         rew_ang_vel_xy = torch.sum(torch.square(self.robot.data.root_ang_vel_b[:, :2]), dim=1)
         
@@ -245,6 +257,10 @@ class Rob6323Go2Env(DirectRLEnv):
         return died, time_out
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
+        # Bonus
+        n = len(env_ids)
+        self.rand_stict[env_ids] = sample_uniform(0.0, 2.5, (n,), device=self.device)
+        self.rand_visc[env_ids] = sample_uniform(0.00, 0.3, (n,), device=self.device)
         # Reset last actions hist
         self.last_actions[env_ids] = 0.
         # Reset raibert quantity
